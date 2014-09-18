@@ -2,19 +2,13 @@
     require_once('assets/config.php');
     
     //Connect to mysql server
-    $link = mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
+    $link = pg_connect("host=$db_host user=$db_user password=$db_password dbname=$db_database");
     if(!$link) {
-           die('Failed to connect to server: ' . mysql_error());
+           die('Failed to connect to server: ' . pg_last_error());
     }
 
-    //Select database
-    $db = mysql_select_db(DB_DATABASE);
-    if(!$db) {
-           die("Unable to select database");
-    }
-
-    $query = "SHOW TABLES;";
-    $result_tables = mysql_query($query);
+    $query = "SELECT table_name FROM information_schema.tables WHERE table_schema='public';";
+    $result_tables = pg_query($link,$query);
 
 ?>
 
@@ -37,13 +31,13 @@
 
 <body>
 <div id=wrapper>
-    <h1><?php echo DB_DATABASE; ?></h1>
+    <h1><?php echo $db_database; ?></h1>
     <div id="formcontroles">
 		<div class="tablecontrols">
 			<select data-placeholder="Select table…" class="chzn-select" id="select-table" onchange="changetable()">
 				<option value=""></option> 
         		<?php
-        			while ($row = mysql_fetch_array($result_tables)){
+        			while ($row = pg_fetch_array($result_tables)){
             			echo "<option>".$row[0]."</option>";
         			}
         		?>

@@ -2,20 +2,11 @@
 
 include "config.php";
 
-//Connect to mysql server
-$link = mysql_connect(DB_HOST, DB_USER, DB_PASSWORD);
+//Connect to server
+$link = pg_connect("host=$db_host user=$db_user password=$db_password dbname=$db_database");
 if(!$link) {
-       die('Failed to connect to server: ' . mysql_error());
+       die('Failed to connect to server: ' . pg_last_error());
 }
-
-//Select database
-$db = mysql_select_db(DB_DATABASE);
-if(!$db) {
-       die("Unable to select database");
-}
-
-$query = "SHOW TABLES;";
-$result_tables = mysql_query($query);
 
 if (!isset($_REQUEST["table"])){
 	die ("no table selected");
@@ -25,32 +16,35 @@ $num_rows = (isset($_REQUEST["num_rows"])) ? intval($_REQUEST["num_rows"]) : 30;
 $page = (isset($_REQUEST["page"])) ? intval($_REQUEST["page"]) : 0;
 
 
-$query_fields = "SHOW COLUMNS FROM ".$_REQUEST["table"];
-$results_fields = mysql_query($query_fields);
+$query_fields = 'SELECT column_name FROM information_schema.columns WHERE table_name = $1';
+$results_fields = pg_query_params($link, $query_fields,array($_REQUEST["table"]));
 
 $r_fields = array();
-while ($row = mysql_fetch_assoc($results_fields)){
-	$r_fields[] = $row["Field"];
+while ($row = pg_fetch_assoc($results_fields)){
+	$r_fields[] = $row["column_name"];
 }
 
 
-$query = "SELECT * FROM ".$_REQUEST["table"];
-if (isset($_REQUEST["order"])){
-	$query .= " ORDER BY ".$_REQUEST["order"];
+$query = "SELECT * FROM ".pg_escape_identifier($_REQUEST["table"]);
+if (isset($_REQUEST["order"]) && $_REQUEST["order"] != "null"){
+	$query .= " ORDER BY ".pg_escape_identifier($_REQUEST["order"]);
 	if (isset($_REQUEST["dir"])){
-		$query .= " ".$_REQUEST["dir"];
+		$query .= " ".pg_escape_string($_REQUEST["dir"]);
 	}
 }
 
 $query .= " LIMIT ".$num_rows." OFFSET ".($num_rows * $page);
 
-$result = mysql_query($query);
+$result = pg_query($link,$query);
 
 $results_array = array();
+if (!$result) {
+	die('Failed to get results '. pg_last_error());
+}
 
-if (mysql_num_rows($result) > 0){
+if (pg_num_rows($result) > 0){
 	
-	while($row = mysql_fetch_assoc($result)){
+	while($row = pg_fetch_assoc($result)){
 		$row_array = array();
 		foreach ($row as $key=>$value){
 			$row_array[] = $value;
@@ -60,9 +54,9 @@ if (mysql_num_rows($result) > 0){
 	
 }
 
-$query = "SELECT COUNT(id) FROM ".$_REQUEST["table"];
-$result_count = mysql_query($query);
-$row_count = mysql_fetch_array($result_count);
+$query = "SELECT COUNT(*) FROM ".pg_escape_identifier($_REQUEST["table"]);
+$result_count = pg_query($link,$query);
+$row_count = pg_fetch_array($result_count);
 $num = $row_count[0];
 
 class returnObj{
